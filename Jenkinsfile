@@ -1,5 +1,8 @@
 pipeline {
-  agent any
+  agent { label 'linux' }
+  tools {
+    git 'git'
+  }
 
   parameters {
     string(name: 'REGISTRY', defaultValue: 'docker.io/dongkyu93', description: 'Docker registry namespace (e.g., docker.io/<your-account>)')
@@ -37,8 +40,6 @@ pipeline {
     stage('Backend Build') {
       steps {
         dir('backend') {
-          sh 'npm ci'
-          sh 'npm run build'
           sh 'docker build -t ${REPO_BACK}:${IMAGE_TAG} -t ${REPO_BACK}:latest .'
         }
       }
@@ -47,8 +48,6 @@ pipeline {
     stage('Frontend Build') {
       steps {
         dir('frontend') {
-          sh 'npm ci'
-          sh 'npm run build'
           sh 'docker build -t ${REPO_FRONT}:${IMAGE_TAG} -t ${REPO_FRONT}:latest .'
         }
       }
