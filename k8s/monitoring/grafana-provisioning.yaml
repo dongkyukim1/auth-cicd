@@ -1,0 +1,172 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  http-requests.json: |
+    {
+      "title": "HTTP Requests",
+      "schemaVersion": 37,
+      "version": 1,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Requests rate",
+          "targets": [
+            { "expr": "sum by (route,method)(rate(http_request_duration_seconds_count[1m]))" }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "p90 latency",
+          "targets": [
+            { "expr": "histogram_quantile(0.9, sum by (le,route,method)(rate(http_request_duration_seconds_bucket[5m])))" }
+          ]
+        }
+      ]
+    }
+  auth-flow.json: |
+    {
+      "title": "Auth Flow",
+      "schemaVersion": 37,
+      "version": 1,
+      "panels": [
+        { "type": "stat", "title": "Email sends (5m)", "targets": [{ "expr": "increase(auth_email_send_total[5m])" }] },
+        { "type": "stat", "title": "OTP verifies (5m)", "targets": [{ "expr": "increase(auth_otp_verify_total[5m])" }] },
+        { "type": "stat", "title": "Registers (5m)", "targets": [{ "expr": "increase(auth_register_total[5m])" }] },
+        { "type": "stat", "title": "Logins (5m)", "targets": [{ "expr": "increase(auth_login_total[5m])" }] },
+        { "type": "timeseries", "title": "Login success/error rate", "targets": [
+          { "expr": "sum by (result)(rate(auth_login_total[5m]))" }
+        ]},
+        { "type": "gauge", "title": "OTP verify success ratio", "targets": [
+          { "expr": "sum(rate(auth_otp_verify_total{result=\"success\"}[5m])) / ignoring(result) sum(rate(auth_otp_verify_total[5m]))" }
+        ]}
+      ]
+    }
+  web-vitals.json: |
+    {
+      "title": "Web Vitals",
+      "schemaVersion": 37,
+      "version": 1,
+      "panels": [
+        { "type": "timeseries", "title": "LCP p90 (s)", "targets": [
+          { "expr": "histogram_quantile(0.9, sum by (le,page)(rate(web_vitals_lcp_seconds_bucket[5m])))" }
+        ]},
+        { "type": "timeseries", "title": "FCP p90 (s)", "targets": [
+          { "expr": "histogram_quantile(0.9, sum by (le,page)(rate(web_vitals_fcp_seconds_bucket[5m])))" }
+        ]},
+        { "type": "timeseries", "title": "TTFB p90 (s)", "targets": [
+          { "expr": "histogram_quantile(0.9, sum by (le,page)(rate(web_vitals_ttfb_seconds_bucket[5m])))" }
+        ]},
+        { "type": "timeseries", "title": "INP p90 (s)", "targets": [
+          { "expr": "histogram_quantile(0.9, sum by (le,page)(rate(web_vitals_inp_seconds_bucket[5m])))" }
+        ]},
+        { "type": "timeseries", "title": "CLS p90", "targets": [
+          { "expr": "histogram_quantile(0.9, sum by (le,page)(rate(web_vitals_cls_bucket[5m])))" }
+        ]},
+        { "type": "stat", "title": "Samples (5m)", "targets": [
+          { "expr": "sum(increase(web_vitals_events_total[5m])) by (name)" }
+        ]}
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
+            - name: providers
+              mountPath: /etc/grafana/provisioning/dashboards
+              readOnly: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+        - name: providers
+          projected:
+            sources:
+              - configMap:
+                  name: grafana-dashboard-providers
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-providers
+  namespace: monitoring
+  labels:
+    grafana_dashboard_providers: "1"
+data:
+  providers.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  type: LoadBalancer
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000

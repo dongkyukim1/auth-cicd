@@ -1,0 +1,11 @@
+{
+  "allow": [
+    ".env",
+    ".env.local"
+  ],
+  "deny": [
+    "node_modules",
+    "dist",
+    "build"
+  ]
+}

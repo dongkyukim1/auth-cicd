@@ -1,0 +1,9 @@
+!node_modules
+!dist
+!build
+!backend/.env
+!backend/.env.local
+!frontend/.env
+!frontend/.env.local
+!backend/.env.example
+!frontend/.env.example

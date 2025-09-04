@@ -1,0 +1,22 @@
+# Node / build artifacts
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.tsbuildinfo
+
+# Env files
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+
+# Local logs
+*.log
+
+# K8s secrets (real file, not committed)
+k8s/secrets.yaml
+
+

@@ -1,0 +1,12 @@
+{
+    "allow": [
+      "backend/.env",
+      "backend/.env.local"
+    ],
+    "deny": [
+      "node_modules",
+      "dist",
+      "build"
+    ]
+  }
+  
